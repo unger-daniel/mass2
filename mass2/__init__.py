@@ -33,7 +33,6 @@ from .core import (
     NoiseResult,
     misc,
     show,
-    compat,
     FilterMaker,
     ChannelHeader,
     MultiFit,
