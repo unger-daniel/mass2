@@ -150,7 +150,6 @@ class SummarizeExtendedStep(RecipeStep):
 
     frametime_s: float
     peak_index: int
-    pulse_col: str
     pretrigger_ignore_samples: int
     n_presamples: int
     transform_raw: Callable | None = None
@@ -161,11 +160,13 @@ class SummarizeExtendedStep(RecipeStep):
     onset_sigma: float = 3.0
     onset_samples: int = 3
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calculate the extended summary statistics and return a new DataFrame."""
+        assert pulseframer is not None
+        rawcol = self.inputs[0]
         summaries = []
-        for df_iter in df.select(self.inputs).iter_slices():
-            raw = df_iter[self.pulse_col].to_numpy()
+        for raw_df in pulseframer.iterate_raw_pulses(chunksize=4096):
+            raw = raw_df[rawcol].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
 

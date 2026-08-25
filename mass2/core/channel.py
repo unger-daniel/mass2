@@ -953,6 +953,7 @@ class Channel:
         out_names = mass2.core.pulse_algorithms.extended_result_dtype.names
         # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
         assert out_names is not None
+        assert self.pulseframer is not None
         outputs = list(out_names)
         step = SummarizeExtendedStep(
             inputs=[col],
@@ -961,7 +962,6 @@ class Channel:
             use_expr=pl.lit(True),
             frametime_s=self.frametime_s,
             peak_index=peak_index,
-            pulse_col=col,
             pretrigger_ignore_samples=pretrigger_ignore_samples,
             n_presamples=self.n_presamples,
             transform_raw=self.transform_raw,
