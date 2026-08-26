@@ -214,20 +214,20 @@ extended_result_dtype = np.dtype([
     ("delta_max", np.uint16),  # max absolute diff between consecutive samples
     ("delta_rms", np.float32),  # RMS of consecutive differences
     ("fall_time", np.float32),  # 90% to 10% fall time on the trailing edge (seconds)
-    ("mean", np.float32),  # mean baseline-subtracted ADC value
+    ("mean", np.float32),  # mean raw ADC value
     ("min_index", np.uint16),  # sample index of the minimum ADC value
     ("min_value", np.uint16),  # minimum raw ADC value
     ("peak_index", np.uint16),  # sample index of the maximum ADC value
     ("peak_index_interp", np.float32),  # sub-sample peak position from parabolic interpolation (samples)
     ("peak_value", np.uint16),  # baseline-subtracted peak ADC value
-    ("peak_value_interp", np.float32),  # sub-sample peak ADC value from parabolic interpolation (raw, not baseline-subtracted)
+    ("peak_value_interp", np.float32),  # sub-sample baseline-subtracted peak ADC value from parabolic interpolation
     ("peaks", np.uint16),  # number of local maxima above the 10% threshold (ideal pulse = 1)
     ("postpeak_deriv", np.float32),  # maximum post-peak derivative (0.1 * max 5-point slope), proxy for ringing
     ("promptness", np.float32),  # fraction of pulse energy in the prompt window (samples nPresamples+2..+7)
     ("range", np.float32),  # peak-to-peak spread (max - min)
     ("rise_time", np.float32),  # 10% to 90% rise time on the leading edge (seconds)
     ("rise_timescale", np.float32),  # missing area between the rising edge and a step to peak, over peak_above_baseline (samples)
-    ("rms", np.float32),  # RMS of the baseline-subtracted signal
+    ("rms", np.float32),  # RMS of the raw signal around its own mean
     ("shift1", np.uint16),  # 1 if the prompt window was shifted 1 sample earlier due to early pulse onset
     ("slope", np.float32),  # linear slope (ADC/sample)
     ("traceless", np.bool_),  # True if the trace is empty (nSamples == 0)
@@ -578,10 +578,11 @@ def summarize_data_numba_extended(  # noqa: PLR0914, PLR0917
         if n_full > 1:
             results["delta_rms"][j] = np.sqrt(pulse_diffsq_sum / (n_full - 1))
 
+        raw_mean_full = sum_y_full / n_full
+        results["mean"][j] = raw_mean_full
+        results["rms"][j] = np.sqrt(sum_y2_full / n_full - raw_mean_full**2)
+
         trace_area_val = sum_y_full - n_full * ptm
-        trace_mean_val = trace_area_val / n_full
-        results["mean"][j] = trace_mean_val
-        results["rms"][j] = np.sqrt(sum_y2_full / n_full - ptm * trace_mean_val * 2 - ptm**2)
         results["centroid"][j] = (
             (sum_xy_full - ptm * sum_x_full) / trace_area_val if trace_area_val != 0 else 0.0
         )
@@ -628,13 +629,13 @@ def summarize_data_numba_extended(  # noqa: PLR0914, PLR0917
             denom2 = p_left - 2.0 * p_mid + p_right
             if denom2 < 0:
                 results["peak_index_interp"][j] = peak_index + 0.5 * (p_left - p_right) / denom2
-                results["peak_value_interp"][j] = p_mid - (p_right - p_left) ** 2 / (8.0 * denom2)
+                results["peak_value_interp"][j] = p_mid - (p_right - p_left) ** 2 / (8.0 * denom2) - ptm
             else:
                 results["peak_index_interp"][j] = float(peak_index)
-                results["peak_value_interp"][j] = p_mid
+                results["peak_value_interp"][j] = p_mid - ptm
         else:
             results["peak_index_interp"][j] = float(peak_index)
-            results["peak_value_interp"][j] = float(pulse[peak_index])
+            results["peak_value_interp"][j] = float(pulse[peak_index]) - ptm
 
         # ---- pulse_sign: compare peak and min amplitude against noise threshold ----
         results["pulse_onset"][j] = -1
